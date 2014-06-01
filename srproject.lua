@@ -19,7 +19,10 @@ b_end = 3
 behavior = b_search
 behavior_old = b_search
 
+b_leaves_chain = 0
+
 wait_time = 0
+wait_chain_time = 0
 
 valid_chain_member = 0
 
@@ -62,9 +65,9 @@ y_Velo = 30
 
 
 -- pattern
-dTarget = 180
+dTarget = 200
 epsilon = 50
-maxLength = dTarget / 5
+maxLength = dTarget / 8
 
 
 --[[
@@ -133,10 +136,6 @@ function init()
 
 	setSpeed(30, 0)
 
-
-	behavior_change(b_search)
-
-
 end
 
 
@@ -176,9 +175,7 @@ function isTail()
 	local isTail = 0
 
 	-- robot is tail if it recieves only one chain member
-	local m_count = count_message_recieved_in(1)
-	m_count = m_count + count_message_recieved_in(2)
-	m_count = m_count + count_message_recieved_in(3)
+	local m_count = count_chain_sum
 
 	if (m_count <=1) then
 		isTail = 1
@@ -189,6 +186,88 @@ return isTail end
 
 function chain_position_decision()
 
+	if (valid_chain_member == 0) then
+
+		log("CHAIN_DECISISON")
+
+		if (count_green_members == 0) and (count_red_members == 0) and (count_blue_members == 1) or (count_chain_sum == 0) then -- end of the chain -> green
+			chain_color = color_green
+			valid_chain_member = 2
+			wait_chain_time = robot.random.uniform() * robot.random.uniform()  + 1
+			log("wait_chain_time" .. wait_chain_time)
+			log("green")
+
+		end
+
+		if(count_green_members == 1) and (count_red_members == 0) and (count_blue_members == 0) then -- end of the chain
+			chain_color = color_red
+			valid_chain_member = 2
+			wait_chain_time = robot.random.uniform() * robot.random.uniform()  + 1
+			log("wait_chain_time" .. wait_chain_time)
+			log("red")
+		end
+
+		if(count_green_members == 0) and (count_red_members == 1) and (count_blue_members == 0) then -- end of the chain
+			chain_color = color_blue
+			valid_chain_member = 2
+			wait_chain_time = robot.random.uniform() * robot.random.uniform()  + 1
+			log("wait_chain_time" .. wait_chain_time)
+			log("blue")
+		end
+
+		b_leaves_chain = 2
+
+	end
+
+end
+
+function set_chain_position()
+
+	log("SET CHAIN POSITION" ..chain_color)
+
+
+	if (chain_color == color_green ) and (count_green_members == 0) then
+
+		robot.range_and_bearing.set_data(1, 1)
+		robot.leds.set_all_colors("green")
+		valid_chain_member = 1
+
+		setSpeed(0,0)
+		log("GREEN")
+	end
+
+	if (chain_color == color_red ) and ( count_red_members == 0 ) then
+
+		robot.range_and_bearing.set_data(2, 1)
+		robot.leds.set_all_colors("red")
+		valid_chain_member = 1
+
+		setSpeed(0,0)
+		log("RED")
+	end
+
+	if (chain_color == color_blue ) and ( count_blue_members == 0 )then
+
+		robot.range_and_bearing.set_data(3, 1)
+		robot.leds.set_all_colors("blue")
+		valid_chain_member = 1
+
+		setSpeed(0,0)
+		log("BLUE")
+	end
+
+	if (valid_chain_member == 2) then
+
+		chain_color = 0
+		valid_chain_member = 0
+
+		-- still not a valid chain member than test if the robot found the prey
+		if (isOnPrey() == false) then
+			reset_all()
+			behavior_change(b_exploration)
+		end
+
+	end
 
 end
 
@@ -198,64 +277,51 @@ function step_b_chain()
 
 
 
+	if(wait_chain_time >1) then
+		wait_chain_time = wait_chain_time - 1
+	else
 
+		if (valid_chain_member == 0) and (behavior == b_chain) then
 
-	if (valid_chain_member == 0) then
+			chain_position_decision()
 
-		if(count_green_members == 0) and (count_red_members == 0) and (count_blue_members == 1) or (count_chain_sum == 0) then -- end of the chain -> green
-			robot.range_and_bearing.set_data(1, 1)
-			robot.leds.set_all_colors("green")
-			valid_chain_member = 1
-			chain_color = color_green
-			setSpeed(0,0)
 		end
-
-		if(count_green_members == 1) and (count_red_members == 0) and (count_blue_members == 0) then -- end of the chain
-			robot.range_and_bearing.set_data(2, 1)
-			robot.leds.set_all_colors("red")
-			valid_chain_member = 1
-			chain_color = color_red
-			setSpeed(0,0)
-		end
-
-		if(count_green_members == 0) and (count_red_members == 1) and (count_blue_members == 0) then -- end of the chain
-			robot.range_and_bearing.set_data(3, 1)
-			robot.leds.set_all_colors("blue")
-			valid_chain_member = 1
-			chain_color = color_blue
-			setSpeed(0,0)
-		end
-
+		set_chain_position()
 
 
 	end
 
-	if (valid_chain_member == 0) then
-		-- still not a valid chain member than test if the robot found the prey
-		if (isOnPrey() == false) then
-			reset_all()
-			behavior_change(b_exploration)
-		end
 
 
 
-	end
 
-	if (isTail() == 1 and groundIsWhite >=0.9) then
-		r_leave = robot.random.uniform()
-		log("r_leave" .. r_leave)
-		log("p_leave" .. p_leave)
-		if (r_leave < p_leave) then
-			reset_all()
-			robot.wheels.set_velocity(30,30)
-			behavior_change(b_exploration)
-		end
-
-	end
 
 	if (valid_chain_member == 1) then -- expand distance
 
-		if (count_chain_sum >=2) then
+		-- look if there is another robot with the same color
+		-- if this is true than flip a coin to leave the chain
+
+			if (chain_color == color_green ) and (count_green_members > 0) then
+
+				leave_chain_decision()
+			end
+
+			if (chain_color == color_red ) and ( count_red_members > 0 ) then
+
+				leave_chain_decision()
+			end
+
+			if (chain_color == color_blue ) and ( count_blue_members > 0 )then
+
+				leave_chain_decision()
+			end
+
+			if(groundIsWhite < 0.90) and (count_chain_sum > 2) then
+
+				leave_chain_decision()
+			end
+
+		if (count_chain_sum >=1) then
 
 			patternExpand()
 
@@ -267,8 +333,29 @@ function step_b_chain()
 	end
 
 
+	isOnPrey()
 
 end
+
+function leave_chain_decision()
+
+	-- decide if it should leave the chain
+
+--	if (isTail() == 1 and groundIsWhite >=0.9) then
+		r_leave = robot.random.uniform()
+		--log("r_leave" .. r_leave)
+		--log("p_leave" .. p_leave)
+		if (r_leave < p_leave) then
+			reset_all()
+			robot.wheels.set_velocity(30,30)
+			b_leaves_chain = 1
+			behavior_change(b_exploration)
+		end
+
+--	end
+
+end
+
 
 
 function isOnPrey()
@@ -295,7 +382,6 @@ function reset_all()
 	valid_chain_member = 0
 	robot.leds.set_all_colors("black")
 
-
 end
 
 
@@ -303,21 +389,21 @@ function step_b_exploration()
 
 
 	reset_all();
-	-- setSpeed(5,0)
-	--exploration_along_chain()
+	setSpeed(30,0)
+	exploration_along_chain()
 
 
 	if (isTail() == 1) then
 		r_chain = robot.random.uniform()
-		log("r_chain" .. r_chain)
-		log("p_chain" .. p_chain)
+		--log("r_chain" .. r_chain)
+		--log("p_chain" .. p_chain)
 		if (r_chain >= p_chain) then
 			behavior_change(b_chain)
 		end
 	end
 
 	-- look for prey
-	--isOnPrey()
+	isOnPrey()
 	-- if(groundIsWhite == 0) then
 	-- 	log("groundIsWhite" .. groundIsWhite)
 	-- 	behavior_change(b_chain)
@@ -486,11 +572,11 @@ function exploration_along_chain()
 			normLength = 1
 		end
 		-- log("TURN BY: " .. turnSpeed)
-		setSpeed(x_Velo, turnSpeed / normLength)
+		setForceSpeed(x_Velo * normLength , turnSpeed )
 
 	else
 
-		setSpeed(x_Velo, 0)
+		setForceSpeed(x_Velo, 0)
 	end
 end
 
@@ -808,7 +894,7 @@ function patternExpand()
 		if(type(tab) == "table") then
 
 			-- is it a green, red or blue chain member than calculate the force
-			if (tab.value >= 0.03) then
+			if (tab.value >= 0.01) then
 			--	log ("HB : " .. tab.horizontal_bearing)
 			--	log ("Range : " .. tab.range)
 				local hb = tab.angle
@@ -855,5 +941,6 @@ function patternExpand()
 		normLength = 1
 	end
 
+	--log("Force Speed" ..turnSpeed)
 	setForceSpeed(x_Velo/3 * normLength, turnSpeed)
 end

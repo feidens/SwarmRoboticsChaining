@@ -6,7 +6,7 @@
   <!-- ************************* -->
   <framework>
     <!-- To make ARGoS faster, you can set 'threads' to some number greater than 0 -->
-    <system threads="2" />
+    <system threads="4" />
     <!-- To change the random seed for each experiment repetition, you can set 'random_seed' to whatever value you like -->
     <experiment length="0" ticks_per_second="10" random_seed="124" />
   </framework>
@@ -84,7 +84,7 @@
       <entity quantity="40" max_trials="10" base_num="1">
         <!-- You can play with the range of the range and bearing system changing the 'rab_range' attribute
              NOTE: here it is expressed in meters, while in the controller you'll work in cm! -->
-        <foot-bot id="rescuer" rab_range="2.5" controller="controller" /> 
+        <foot-bot id="rescuer" rab_range="2.5" controller="controller" />
       </entity>
     </distribute>
   </arena>
@@ -107,7 +107,7 @@
   <!-- * Visualization * -->
   <!-- ****************** -->
   <visualization>
-    <!-- To execute ARGoS in batch without visualization, just comment out the 'qt-opengl' section 
+    <!-- To execute ARGoS in batch without visualization, just comment out the 'qt-opengl' section
     -->
     <qt-opengl lua_editor="true">
       <camera>
