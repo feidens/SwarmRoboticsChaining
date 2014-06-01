@@ -114,7 +114,7 @@ function init()
 -------------------------------------------
 
 	-- initialize counterSyncBeat with a random value < tMax
-	counterSyncBeat = robot.random.uniform(tMax)
+	--counterSyncBeat = robot.random.uniform(tMax)
 	-- log("counterSyncBeat init : " .. counterSyncBeat)
 
 	x_Velo = 30
@@ -178,24 +178,24 @@ function isTail()
 	local m_count = count_chain_sum
 
 	if (m_count <=1) then
-		isTail = 1
+		return true
 	end
 
-return isTail end
+return false end
 
 
 function chain_position_decision()
 
 	if (valid_chain_member == 0) then
 
-		log("CHAIN_DECISISON")
+		--log("CHAIN_DECISISON")
 
 		if (count_green_members == 0) and (count_red_members == 0) and (count_blue_members == 1) or (count_chain_sum == 0) then -- end of the chain -> green
 			chain_color = color_green
 			valid_chain_member = 2
 			wait_chain_time = robot.random.uniform() * robot.random.uniform()  + 1
-			log("wait_chain_time" .. wait_chain_time)
-			log("green")
+			--log("wait_chain_time" .. wait_chain_time)
+			--log("green")
 
 		end
 
@@ -203,16 +203,16 @@ function chain_position_decision()
 			chain_color = color_red
 			valid_chain_member = 2
 			wait_chain_time = robot.random.uniform() * robot.random.uniform()  + 1
-			log("wait_chain_time" .. wait_chain_time)
-			log("red")
+			--log("wait_chain_time" .. wait_chain_time)
+			--log("red")
 		end
 
 		if(count_green_members == 0) and (count_red_members == 1) and (count_blue_members == 0) then -- end of the chain
 			chain_color = color_blue
 			valid_chain_member = 2
 			wait_chain_time = robot.random.uniform() * robot.random.uniform()  + 1
-			log("wait_chain_time" .. wait_chain_time)
-			log("blue")
+		--log("wait_chain_time" .. wait_chain_time)
+		--log("blue")
 		end
 
 		b_leaves_chain = 2
@@ -223,7 +223,7 @@ end
 
 function set_chain_position()
 
-	log("SET CHAIN POSITION" ..chain_color)
+	--log("SET CHAIN POSITION" ..chain_color)
 
 
 	if (chain_color == color_green ) and (count_green_members == 0) then
@@ -233,7 +233,7 @@ function set_chain_position()
 		valid_chain_member = 1
 
 		setSpeed(0,0)
-		log("GREEN")
+		--log("GREEN")
 	end
 
 	if (chain_color == color_red ) and ( count_red_members == 0 ) then
@@ -243,7 +243,7 @@ function set_chain_position()
 		valid_chain_member = 1
 
 		setSpeed(0,0)
-		log("RED")
+		--log("RED")
 	end
 
 	if (chain_color == color_blue ) and ( count_blue_members == 0 )then
@@ -253,7 +253,7 @@ function set_chain_position()
 		valid_chain_member = 1
 
 		setSpeed(0,0)
-		log("BLUE")
+		--log("BLUE")
 	end
 
 	if (valid_chain_member == 2) then
@@ -321,6 +321,9 @@ function step_b_chain()
 				leave_chain_decision()
 			end
 
+
+
+
 		if (count_chain_sum >=1) then
 
 			patternExpand()
@@ -330,7 +333,14 @@ function step_b_chain()
 			setSpeed(0,0)
 		end
 
+		if (isTail() == true) then
+
+			leave_chain_decision()
+
+		end
+
 	end
+
 
 
 	isOnPrey()
@@ -393,7 +403,7 @@ function step_b_exploration()
 	exploration_along_chain()
 
 
-	if (isTail() == 1) then
+	if (isTail() == true) then
 		r_chain = robot.random.uniform()
 		--log("r_chain" .. r_chain)
 		--log("p_chain" .. p_chain)
@@ -415,7 +425,7 @@ end
 
 function behavior_change(new_behavior)
 	wait_time = robot.random.uniform() * 20 + 2
-	log("wait_time" .. wait_time)
+	--log("wait_time" .. wait_time)
 	behavior = new_behavior
 end
 
@@ -439,7 +449,7 @@ function step()
 	else
 
 
-		if(behavior == b_search) then -- robot in exploration behavior
+		if(behavior == b_search) then -- robot in search behavior
 
 			setSpeed(30, 0)
 
@@ -447,7 +457,13 @@ function step()
 
 			collisionDetection()
 
-			behavior_change(b_exploration)
+
+
+			if (groundIsWhite == 1 ) then
+
+				behavior_change(b_exploration)
+			end
+
 
 		end
 
