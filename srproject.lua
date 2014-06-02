@@ -1,8 +1,10 @@
 -- Put your global variables here
 
+
+
 -- Variables Second Approach
 
-p_chain = 0.99            -- prob. threshold to be part of a chain (Explore -> Chain)
+p_chain = 0.90            -- prob. threshold to be part of a chain (Explore -> Chain)
 p_leave = 1 - p_chain     -- prob. threshold to leave a chain as last member of it (Chain -> Explore)
 p_search = p_chain / 3    -- prob. threshold to abort exploration and search nest or prey (Explore -> Search)
 
@@ -65,9 +67,17 @@ y_Velo = 30
 
 
 -- pattern
-dTarget = 200
+dTarget = 300
 epsilon = 50
 maxLength = dTarget / 8
+
+
+
+-- exploration along chain
+
+chain_dTarget = 60
+chain_epsilon = 60000
+
 
 
 --[[
@@ -104,6 +114,10 @@ comData={
 --[[ This function is executed every time you press the 'execute'
      button ]]
 function init()
+
+	-- Experiment
+	robot.in_chain = 0
+
 
 	groundIsWhite = 1
 	valid_chain_member = 0
@@ -231,7 +245,7 @@ function set_chain_position()
 		robot.range_and_bearing.set_data(1, 1)
 		robot.leds.set_all_colors("green")
 		valid_chain_member = 1
-
+		robot.in_chain = 1
 		setSpeed(0,0)
 		--log("GREEN")
 	end
@@ -241,7 +255,7 @@ function set_chain_position()
 		robot.range_and_bearing.set_data(2, 1)
 		robot.leds.set_all_colors("red")
 		valid_chain_member = 1
-
+		robot.in_chain = 1
 		setSpeed(0,0)
 		--log("RED")
 	end
@@ -251,7 +265,7 @@ function set_chain_position()
 		robot.range_and_bearing.set_data(3, 1)
 		robot.leds.set_all_colors("blue")
 		valid_chain_member = 1
-
+		robot.in_chain = 1
 		setSpeed(0,0)
 		--log("BLUE")
 	end
@@ -260,7 +274,7 @@ function set_chain_position()
 
 		chain_color = 0
 		valid_chain_member = 0
-
+		robot.in_chain = 0
 		-- still not a valid chain member than test if the robot found the prey
 		if (isOnPrey() == false) then
 			reset_all()
@@ -316,7 +330,7 @@ function step_b_chain()
 				leave_chain_decision()
 			end
 
-			if(groundIsWhite < 0.90) and (count_chain_sum > 2) then
+			if (groundIsWhite < 0.90) and (count_chain_sum > 2) then
 
 				leave_chain_decision()
 			end
@@ -333,9 +347,11 @@ function step_b_chain()
 			setSpeed(0,0)
 		end
 
-		if (isTail() == true) then
 
-			leave_chain_decision()
+		-- if robot is tail and not used by other robots to explore
+		if ( isTail() == true ) and ( count_message_recieved() > 0 ) then
+
+			--leave_chain_decision()
 
 		end
 
@@ -371,12 +387,12 @@ end
 function isOnPrey()
 
 	-- only one per prey
-	if (groundIsWhite == 0 and (count_message_recieved_in(4) == 0)) then
+	if (groundIsWhite <= 0.1) and (count_prey_members == 0) then
 		robot.range_and_bearing.set_data(4, 1)
 		robot.leds.set_all_colors("white")
 		valid_chain_member = 1
 		chain_color = color_prey
-		setSpeed(0,0)
+		setSpeed(30,0)
 		behavior_change(b_end)
 		return true
 	else
@@ -389,7 +405,10 @@ function reset_all()
 	robot.range_and_bearing.set_data(3, 0)
 	robot.range_and_bearing.set_data(2, 0)
 	robot.range_and_bearing.set_data(1, 0)
+	robot.range_and_bearing.set_data(4, 0)
 	valid_chain_member = 0
+	robot.in_chain = 0
+	x_Velo = 30
 	robot.leds.set_all_colors("black")
 
 end
@@ -399,11 +418,16 @@ function step_b_exploration()
 
 
 	reset_all();
-	setSpeed(30,0)
-	exploration_along_chain()
+	--setSpeed(30,0)
 
 
-	if (isTail() == true) then
+	if (collision == 0) then
+
+		exploration_along_chain()
+	end
+
+
+	if (isTail() == true) and (groundIsWhite >= 0.95) then
 		r_chain = robot.random.uniform()
 		--log("r_chain" .. r_chain)
 		--log("p_chain" .. p_chain)
@@ -414,10 +438,12 @@ function step_b_exploration()
 
 	-- look for prey
 	isOnPrey()
+
+
 	-- if(groundIsWhite == 0) then
-	-- 	log("groundIsWhite" .. groundIsWhite)
-	-- 	behavior_change(b_chain)
-	-- end
+	--  	log("groundIsWhite" .. groundIsWhite)
+	--  	behavior_change(b_chain)
+  -- end
 
 
 
@@ -438,6 +464,7 @@ function step()
 	count_green_members = count_message_recieved_in(1)
 	count_red_members = count_message_recieved_in(2)
 	count_blue_members = count_message_recieved_in(3)
+	count_prey_members = count_message_recieved_in(4)
 	count_chain_sum = count_green_members + count_blue_members + count_red_members
 
 	groundIsWhite = robot.motor_ground[1].value + robot.motor_ground[2].value + robot.motor_ground[3].value + robot.motor_ground[4].value
@@ -451,15 +478,17 @@ function step()
 
 		if(behavior == b_search) then -- robot in search behavior
 
-			setSpeed(30, 0)
+
 
 			collisionHandling()
 
 			collisionDetection()
 
+			--step_b_search()
 
 
-			if (groundIsWhite == 1 ) then
+			-- start explore if you have left the nest, or there is a chain member or a nest keeper
+			if ( groundIsWhite == 1 ) or (count_chain_sum > 0) or (count_prey_members > 0) then
 
 				behavior_change(b_exploration)
 			end
@@ -470,11 +499,15 @@ function step()
 
 		if(behavior == b_exploration) then -- robot in exploration behavior
 
-			step_b_exploration()
+
 
 			collisionHandling()
 
 			collisionDetection()
+
+			step_b_exploration()
+
+
 
 		end
 
@@ -490,6 +523,8 @@ function step()
 
 		if(behavior == b_end) then -- robot in end behavior
 
+			step_b_end()
+
 		end
 
 	end
@@ -499,6 +534,32 @@ function step()
 
 end
 
+
+
+function step_b_end()
+
+	setSpeed(0, 0)
+
+	if ( count_prey_members > 0 ) or ( groundIsWhite >= 0.1 ) then
+		behavior_change(b_exploration)
+	end
+
+end
+
+
+function step_b_search()
+
+	if ( count_prey_members == 0 ) and ( groundIsWhite <= 0.95  ) then
+		log("NEST")
+		robot.range_and_bearing.set_data(4, 1)
+		robot.leds.set_all_colors("white")
+		valid_chain_member = 1
+		chain_color = color_prey
+		behavior_change(b_end)
+
+	end
+
+end
 
 function exploration_along_chain()
 	-- body
@@ -524,7 +585,7 @@ function exploration_along_chain()
 					--log("Lastseen " .. lastSeenID)
 					local hb = tab.horizontal_bearing
 					range = tab.range
-					local lennardJones =  lennard_jones(range)
+					local lennardJones =  lennard_jones(range, chain_dTarget, chain_epsilon )
 					--log("leanrd" .. lennardJones)
 					local temp_x = math.cos(hb)
 					local temp_y = math.sin(hb)
@@ -533,9 +594,9 @@ function exploration_along_chain()
 
 					--log("temp_angle " .. temp_angle)
 
-					if (temp_angle <= math.pi/3) and (temp_angle >= -math.pi/3) then
-						--temp_x = lennardJones * math.cos(hb)
-						--temp_y = lennardJones * math.sin(hb)
+					if (temp_angle <= math.pi/3.5) and (temp_angle >= -math.pi/3.5) then
+						temp_x = lennardJones * math.cos(hb)
+						temp_y = lennardJones * math.sin(hb)
 
 						--log("Range " .. range)
 						if (range >= 5) then
@@ -545,7 +606,7 @@ function exploration_along_chain()
 
 							--log("YESSSSSS")
 						end
-					else
+				--	else
 						--log("NOOOOOO")
 					end
 
@@ -564,10 +625,44 @@ function exploration_along_chain()
 				--]]
 			end
 
-	   	end
-		-- log("Count : " .. count)
-		--log("Total x : " .. x)
-		--log("Total y : " .. y)
+	  end
+
+	end
+
+
+		-- local proxTab = table.copy(proximity_table)
+		--
+		-- for key,tab in pairs(proxTab) do
+		--
+		-- 	if(type(tab) == "table") then
+		--
+		-- 		-- is it a green, red or blue chain member than calculate the force
+		-- 		if (tab.value >= 0.01) then
+		-- 		--	log ("HB : " .. tab.horizontal_bearing)
+		-- 		--	log ("Range : " .. tab.range)
+		-- 			local hb = tab.angle
+		-- 			local range = tab.value /10
+		-- 			local force =  lennard_jones(range, chain_dTarget * 2, chain_epsilon * 10)
+		--
+		-- 			local temp_x = force * math.cos(hb)
+		-- 			local temp_y = force * math.sin(hb)
+		-- 			--log("x : " .. temp_x)
+		-- 			--log("y : " .. temp_y)
+		-- 			x = x + temp_x
+		-- 			y = y + temp_y
+		--
+		-- 		end -- end if chain member
+		-- 		--[[
+		-- 		for k,val in pairs(tab.data) do
+		-- 			log("Data Key : " .. k)
+		-- 			log("Data Val : " .. val)
+		--
+		-- 		end
+		-- 		--]]
+		-- 	end -- end if table has correct format
+		--
+		-- end -- end for
+
 
 		angle = math.atan2(y,x)
 		--log("Angle : " .. angle)
@@ -578,7 +673,7 @@ function exploration_along_chain()
 		else
 			turnSpeed = angle
 		end
-		turnSpeed = (turnSpeed * 16) / math.pi
+		turnSpeed = (turnSpeed * 8) / math.pi
 
 		local length = math.sqrt( math.pow(x,2) +  math.pow(y,2))
 		--log("Length : " .. length)
@@ -588,12 +683,11 @@ function exploration_along_chain()
 			normLength = 1
 		end
 		-- log("TURN BY: " .. turnSpeed)
-		setForceSpeed(x_Velo * normLength , turnSpeed )
+		setSpeed(x_Velo , turnSpeed )
+	--else
 
-	else
-
-		setForceSpeed(x_Velo, 0)
-	end
+	--	setForceSpeed(x_Velo, 0)
+	--end
 end
 
 
@@ -605,6 +699,10 @@ end
      automatically by ARGoS. ]]
 function reset()
    -- put your code here
+
+	robot.in_chain = 0
+
+
 end
 
 
@@ -829,10 +927,10 @@ function count_message_recieved()
 	-- log("Count : " .. count)
 return count end
 
-function lennard_jones(range)
+function lennard_jones(range, target, eps)
 	local force = 0
-	local temp = math.pow(dTarget / range, 2)
-	force = -4*epsilon/range * ( math.pow(temp,2) - temp)
+	local temp = math.pow(target / range, 2)
+	force = -4*eps/range * ( math.pow(temp,2) - temp)
 
 
 return force end
@@ -879,7 +977,7 @@ function patternExpand()
 			--	log ("Range : " .. tab.range)
 				local hb = tab.horizontal_bearing
 				local range = tab.range
-				local force =  lennard_jones(range)
+				local force =  lennard_jones(range, dTarget, epsilon)
 
 				local temp_x = force * math.cos(hb)
 				local temp_y = force * math.sin(hb)
@@ -902,40 +1000,40 @@ function patternExpand()
 	-- log("Count : " .. count)
 	--log("Total x : " .. x)
 	--log("Total y : " .. y)
-
-	local proxTab = table.copy(proximity_table)
-
-	for key,tab in pairs(proxTab) do
-
-		if(type(tab) == "table") then
-
-			-- is it a green, red or blue chain member than calculate the force
-			if (tab.value >= 0.01) then
-			--	log ("HB : " .. tab.horizontal_bearing)
-			--	log ("Range : " .. tab.range)
-				local hb = tab.angle
-				local range = tab.value * 100
-				local force =  lennard_jones(range)
-
-				local temp_x = force * math.cos(hb)
-				local temp_y = force * math.sin(hb)
-				--log("x : " .. temp_x)
-				--log("y : " .. temp_y)
-				x = x + temp_x
-				y = y + temp_y
-
-			end -- end if chain member
-			--[[
-			for k,val in pairs(tab.data) do
-				log("Data Key : " .. k)
-				log("Data Val : " .. val)
-
-			end
-			--]]
-		end -- end if table has correct format
-
-	end -- end for
-
+	--
+	-- local proxTab = table.copy(proximity_table)
+	--
+	-- for key,tab in pairs(proxTab) do
+	--
+	-- 	if(type(tab) == "table") then
+	--
+	-- 		-- is it a green, red or blue chain member than calculate the force
+	-- 		if (tab.value >= 0.01) then
+	-- 		--	log ("HB : " .. tab.horizontal_bearing)
+	-- 		--	log ("Range : " .. tab.range)
+	-- 			local hb = tab.angle
+	-- 			local range = tab.value * 100
+	-- 			local force =  lennard_jones(range)
+	--
+	-- 			local temp_x = force * math.cos(hb)
+	-- 			local temp_y = force * math.sin(hb)
+	-- 			--log("x : " .. temp_x)
+	-- 			--log("y : " .. temp_y)
+	-- 			x = x + temp_x
+	-- 			y = y + temp_y
+	--
+	-- 		end -- end if chain member
+	-- 		--[[
+	-- 		for k,val in pairs(tab.data) do
+	-- 			log("Data Key : " .. k)
+	-- 			log("Data Val : " .. val)
+	--
+	-- 		end
+	-- 		--]]
+	-- 	end -- end if table has correct format
+	--
+	-- end -- end for
+	--
 
 
 	angle = math.atan2(y,x)
