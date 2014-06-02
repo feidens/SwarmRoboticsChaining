@@ -7,25 +7,33 @@
 p_chain = 0.90            -- prob. threshold to be part of a chain (Explore -> Chain)
 p_leave = 1 - p_chain     -- prob. threshold to leave a chain as last member of it (Chain -> Explore)
 p_search = p_chain / 3    -- prob. threshold to abort exploration and search nest or prey (Explore -> Search)
+p_nest = 0
 
-b_search = 0
+
+tail_stigma = 0
+
+
+
+b_nest = 0
 b_exploration = 1
 b_chain = 2
-b_end = 3
+b_prey = 3
 
--- 0 := Search nest/prey
+-- 0 := nest
 -- 1 := Exploration
 -- 2 := Chain member
--- 3 := End state
+-- 3 := End state on prey
 
-behavior = b_search
-behavior_old = b_search
+behavior = b_exploration
+behavior_old = b_exploration
 
 b_leaves_chain = 0
 
 wait_time = 0
 wait_chain_time = 0
 
+
+count_chain_sum = 0
 valid_chain_member = 0
 
 chain_color = 0
@@ -75,8 +83,8 @@ maxLength = dTarget / 8
 
 -- exploration along chain
 
-chain_dTarget = 80
-chain_epsilon = 60000
+chain_dTarget = 60
+chain_epsilon = 9000
 
 
 
@@ -92,7 +100,7 @@ maxLength = dTarget / 8
 collision = 0
 collisionLeft = 0
 collisionRight = 0
-
+e ust t   nt
 
 --- com overview
 comData={
@@ -186,12 +194,12 @@ end
 
 
 function isTail()
-	local isTail = 0
 
 	-- robot is tail if it recieves only one chain member
 	local m_count = count_chain_sum
 
-	if (m_count <=1) then
+	if (m_count < 2) then
+
 		return true
 	end
 
@@ -362,6 +370,19 @@ function step_b_chain()
 		end
 
 
+		-- if ( isTail() == true ) then
+		--
+		-- 	tail_stigma = tail_stigma + 1 + ( math.pow( ( 1 + count_chain_sum ), 2 ) /  ( math.pow( ( 1 +  count_messages_sum), 2 ) ) )
+		-- 	robot.range_and_bearing.set_data(5, tail_stigma)
+		-- else
+		--
+		-- 	tail_stigma = math.max(tail_stigma - 1 - + ( math.pow( ( 1 + count_chain_sum ), 2 ) /  ( math.pow( ( 1 +  count_messages_sum), 2 ) ) ), 0)
+		--
+		-- 	robot.range_and_bearing.set_data(5, tail_stigma)
+		--
+		-- end
+
+
 		-- if robot is tail and not used by other robots to explore
 		if ( isTail() == true ) and ( count_message_recieved() > 0 ) then
 
@@ -369,6 +390,21 @@ function step_b_chain()
 			--leave_chain_stigma = leave_chain_stigma + 1  -- for tail
 
 		end
+
+		-- -- calculate probability for leave chain
+		-- p_leave_chain = robot.random.uniform() + ( math.pow( ( 1 + count_chain_sum ), 2 ) /  ( math.pow( ( 1 +  count_messages_sum), 2 ) ) ) - 4*(1 - groundIsWhite)
+		-- p_leave_chain = p_leave_chain / 2
+		--
+		--
+		--
+		--
+		-- r_chain = robot.random.uniform()
+		-- --log("r_chain" .. r_chain)
+		-- --log("p_chain" .. p_chain)
+		-- if (r_chain <= p_leave_chain) then
+		-- 	behavior_change(b_exploration)
+		-- end
+		--
 
 	end
 
@@ -402,13 +438,13 @@ end
 function isOnPrey()
 
 	-- only one per prey
-	if (groundIsWhite <= 0.1) and (count_prey_members == 0) then
+	if (groundIsWhite < 0.5) and (count_prey_members == 0) then
 		robot.range_and_bearing.set_data(4, 1)
 		robot.leds.set_all_colors("white")
 		valid_chain_member = 1
 		chain_color = color_prey
 		setSpeed(30,0)
-		behavior_change(b_end)
+		behavior_change(b_prey)
 		return true
 	else
 		return false
@@ -432,47 +468,86 @@ end
 function step_b_exploration()
 
 
-	reset_all();
-	--setSpeed(30,0)
+	reset_all(); -- resets values to exploration state
 
-
+	-- explore along the chain if no collision is detected
 	if (collision == 0) then
 
 		exploration_along_chain()
+
 	end
 
 
-	-- calculate probability for become a chain member
 
-	p_chain = robot.random.uniform() - ( math.pow( ( 1 + count_chain_sum ), 2 ) /  ( math.pow( ( 1 +  count_messages_sum), 2 ) ) ) - 4*(1 - groundIsWhite)
-	p_chain = p_chain / 2
+	calcPChain()
 
 
-	--if (isTail() == true) and (groundIsWhite >= 0.95) then
-		r_chain = robot.random.uniform()
-		--log("r_chain" .. r_chain)
-		--log("p_chain" .. p_chain)
-		if (r_chain <= p_chain) then
-			behavior_change(b_chain)
-		end
-	--end
+	r_chain = robot.random.uniform()
+	if (r_chain <= p_chain) then
+		behavior_change(b_chain)
+	end
 
 	-- look for prey
 	isOnPrey()
 
+	-- look for nest
+	isOnNest()
 
-	-- if(groundIsWhite == 0) then
-	--  	log("groundIsWhite" .. groundIsWhite)
-	--  	behavior_change(b_chain)
-  -- end
 
+	-- avoid nest after
+	-- if ( groundIsWhite > 0.1 ) and ( groundIsWhite < 0.9 ) then
+	-- 	collisionLeft = 1
+	-- 	collisionRight = 0
+	-- 	collision = 1
+	-- end
 
 
 end
 
+function calcPChain()
+
+	-- calculate probability for become a chain member
+
+	p_chain = robot.random.uniform() - ( math.pow( ( 1 + count_chain_sum ), 2 ) /  ( math.pow( ( 1 +  count_messages_sum), 2 ) ) ) - 10 * (1 - groundIsWhite)
+	p_chain = p_chain / 2
+
+end
+
+
+function calcPNest()
+
+	local nestGround = 1
+	if (groundIsWhite > 0.80) then -- ignore Prey spot
+		nestGround = groundIsWhite
+	end
+	p_nest = - (1 - ( math.pow( ( 1 + count_prey_members ), 2 ) /  ( math.pow( ( 1 +  count_messages_sum), 2 ) ) ) ) +  2 * (1 - nestGround)
+	p_nest = p_nest / 2
+
+end
+
+function isOnNest()
+
+	calcPNest()
+
+	r_nest = robot.random.uniform()
+	--log("r_chain" .. r_chain)
+	--log("p_chain" .. p_chain)
+	if (r_nest <= p_nest) then
+
+		robot.range_and_bearing.set_data(4, 1)
+		robot.leds.set_all_colors("white")
+		valid_chain_member = 1
+		chain_color = color_prey
+		setSpeed(15,0)
+		behavior_change(b_nest)
+	end
+
+end
+
+-- Wait some uniform chosen time steps before next behavior is activated
 function behavior_change(new_behavior)
 	wait_time = robot.random.uniform() * 10 + 1
-	--log("wait_time" .. wait_time)
+
 	behavior = new_behavior
 end
 
@@ -480,57 +555,47 @@ end
      It must contain the logic of your controller ]]
 function step()
 	-- basic step setup
+
+	-- copy proximity table for later use (e.g. Collision Detection)
 	proximity_table = table.copy(robot.proximity)
 
+	-- helper variables for the number of chain members
 	count_green_members = count_message_recieved_in(1)
 	count_red_members = count_message_recieved_in(2)
 	count_blue_members = count_message_recieved_in(3)
-	count_prey_members = count_message_recieved_in(4)
 	count_chain_sum = count_green_members + count_blue_members + count_red_members
 
+	-- helper variable for the number of robots that stands on the prey
+	count_prey_members = count_message_recieved_in(4)
+
+	-- helper variable for the number of overall revieved message,
+	-- which is equal to the number of robots in range
 	count_messages_sum = count_message_recieved()
 
+	-- helper variable for the ground value, 0 == black, 1 == white
 	groundIsWhite = robot.motor_ground[1].value + robot.motor_ground[2].value + robot.motor_ground[3].value + robot.motor_ground[4].value
-
 	groundIsWhite = groundIsWhite / 4
 
+	-- wait before the next behavior is activated
 	if(wait_time >1) then
 		wait_time = wait_time - 1
 	else
 
 
-		if(behavior == b_search) then -- robot in search behavior
+		if(behavior == b_nest) then -- robot in nest behavior
 
-
-
-			collisionHandling()
-
-			collisionDetection()
-
-			--step_b_search()
-
-
-			-- start explore if you have left the nest, or there is a chain member or a nest keeper
-			if ( groundIsWhite == 1 ) or (count_chain_sum < 0) or (count_prey_members > 0) then
-
-				behavior_change(b_exploration)
-			end
-
+			step_b_nest()
 
 		end
 
 
 		if(behavior == b_exploration) then -- robot in exploration behavior
 
-
-
 			collisionHandling()
 
 			collisionDetection()
 
 			step_b_exploration()
-
-
 
 		end
 
@@ -539,14 +604,11 @@ function step()
 
 			step_b_chain()
 
-			-- chain has no seperate collision handling
-			-- robots in chain will avoid walls
-
 		end
 
-		if(behavior == b_end) then -- robot in end behavior
+		if(behavior == b_prey) then -- robot in end/prey behavior
 
-			step_b_end()
+			step_b_prey()
 
 		end
 
@@ -558,40 +620,53 @@ function step()
 end
 
 
-
-function step_b_end()
+-- Execute nest behavior
+-- Robot will leave this behavior depending on p_nest
+-- If there are more nest keepers or robots in range than
+-- it is more likely that the robot will begin to explore
+function step_b_nest()
 
 	setSpeed(0, 0)
 
-	if ( count_prey_members > 0 ) or ( groundIsWhite >= 0.1 ) then
+	calcPNest()
+
+	r_nest = robot.random.uniform()
+	--log("r_chain" .. r_chain)
+	--log("p_chain" .. p_chain)
+	if (r_nest >= 1-p_nest) then
+		reset_all()
+		setSpeed(x_Velo, 0)
 		behavior_change(b_exploration)
 	end
 
 end
 
+-- Execute prey behavior
+-- Robot will leave this behavior depending on the condition:
+-- If there are more prey keepers or robot is no longer on prey
+-- the robot will begin to explore
+function step_b_prey()
 
-function step_b_search()
+	setSpeed(0, 0)
 
-	if ( count_prey_members == 0 ) and ( groundIsWhite <= 0.95  ) then
-		log("NEST")
-		robot.range_and_bearing.set_data(4, 1)
-		robot.leds.set_all_colors("white")
-		valid_chain_member = 1
-		chain_color = color_prey
-		behavior_change(b_end)
-
+	if ( count_prey_members > 0 ) or ( groundIsWhite >= 0.5 ) then
+		reset_all()
+		setSpeed(x_Velo, 0)
+		behavior_change(b_exploration)
 	end
 
 end
 
+-- Execute exploration of robot along the chain members
+-- We use a force calculated with the lennard jones method
 function exploration_along_chain()
-	-- body
+
 
 	local t = robot.range_and_bearing
 	local x = 0
 	local y = 0
 
-	if (count_message_recieved_in(1) >= 1) or (count_message_recieved_in(2) >=1) or (count_message_recieved_in(3) >=1) then
+	if ( count_chain_sum > 0 ) then
 
 		for key,tab in pairs(t) do
 
@@ -617,18 +692,23 @@ function exploration_along_chain()
 
 					--log("temp_angle " .. temp_angle)
 
-					if (temp_angle <= math.pi/3.5) and (temp_angle >= -math.pi/3.5) then
-						temp_x = lennardJones * math.cos(hb)
-						temp_y = lennardJones * math.sin(hb)
+					if (temp_angle <= math.pi/2) and (temp_angle >= -math.pi/2) then
+						-- local alpha = 1
+						-- if (tab.data[5] ~= 0) then
+						-- 	alpha = tab.data[5]
+						-- end
+						-- log(alpha)
+						temp_x =  lennardJones * math.cos(hb)
+						temp_y =  lennardJones * math.sin(hb)
 
 						--log("Range " .. range)
-						if (range >= 5) then
+						--if (range >= 5) then
 
 							x = x + temp_x
 							y = y + temp_y
 
 							--log("YESSSSSS")
-						end
+						--end
 				--	else
 						--log("NOOOOOO")
 					end
@@ -653,38 +733,38 @@ function exploration_along_chain()
 	end
 
 
-	local groundTab = table.copy(robot.motor_ground)
-
-	for key,tab in pairs(groundTab) do
-
-		if(type(tab) == "table") then
-
-			-- is it a green, red or blue chain member than calculate the force
-			if (tab.value >= 0.01) then
-			--	log ("HB : " .. tab.horizontal_bearing)
-			--	log ("Range : " .. tab.range)
-				--local hb = tab.offset
-				local range = tab.value * 100
-				local force =  lennard_jones(range, chain_dTarget * 10, chain_epsilon * 10)
-
-				local temp_x = force * tab.offset.x
-				local temp_y = force * tab.offset.y
-				log("x : " .. temp_x)
-				log("y : " .. temp_y)
-				x = x + temp_x
-				y = y + temp_y
-
-			end -- end if chain member
-			--[[
-			for k,val in pairs(tab.data) do
-				log("Data Key : " .. k)
-				log("Data Val : " .. val)
-
-			end
-			--]]
-		end -- end if table has correct format
-
-	end -- end for
+	-- local groundTab = table.copy(robot.motor_ground)
+	--
+	-- for key,tab in pairs(groundTab) do
+	--
+	-- 	if(type(tab) == "table") then
+	--
+	-- 		-- is it a green, red or blue chain member than calculate the force
+	-- 		if (tab.value >= 0.01) then
+	-- 		--	log ("HB : " .. tab.horizontal_bearing)
+	-- 		--	log ("Range : " .. tab.range)
+	-- 			--local hb = tab.offset
+	-- 			local range = tab.value * 100
+	-- 			local force =  lennard_jones(range, chain_dTarget * 10, chain_epsilon * 10)
+	--
+	-- 			local temp_x = force * tab.offset.x
+	-- 			local temp_y = force * tab.offset.y
+	-- 			log("x : " .. temp_x)
+	-- 			log("y : " .. temp_y)
+	-- 			x = x + temp_x
+	-- 			y = y + temp_y
+	--
+	-- 		end -- end if chain member
+	-- 		--[[
+	-- 		for k,val in pairs(tab.data) do
+	-- 			log("Data Key : " .. k)
+	-- 			log("Data Val : " .. val)
+	--
+	-- 		end
+	-- 		--]]
+	-- 	end -- end if table has correct format
+	--
+	-- end -- end for
 
 
 		-- local proxTab = table.copy(proximity_table)
@@ -740,7 +820,7 @@ function exploration_along_chain()
 			normLength = 1
 		end
 		-- log("TURN BY: " .. turnSpeed)
-		setSpeed(x_Velo , turnSpeed )
+		setForceSpeed(x_Velo , turnSpeed )
 	--else
 
 	--	setForceSpeed(x_Velo, 0)
@@ -771,123 +851,137 @@ function destroy()
 end
 
 
+-- Handles the collsion on the left or right side
+-- The collisions are sometimes ignored to avoid getting stuck
 function collisionHandling()
 
 
-if (collision == 1) then
-k = findMaxKey(proximity_table)
-r = robot.random.bernoulli(0.9)
-
-if (collisionLeft == 1) then
-	--robot.wheels.set_velocity(x_Velo,-y_Velo)
+	if (collision == 1) then
 
 
-	--log("r : " .. r)
-	if (r == 1) then
-		k = 14
-	end
-	if (k == 12) or ( k == 13) or (k == 14)then
-		--log("k : " .. k)
-		collisionLeft = 0
-		collision = 0;
-	end
+	k = findMaxKey(proximity_table)
 
-	-- perhaps the other way arround - right
-	r = robot.random.bernoulli(0.05)
-	if (r == 1) then
-		--log("perhaps right")
-		robot.wheels.set_velocity(-x_Velo/4,y_Velo)
-		--robot.leds.set_all_colors("red")
+	-- random binary variable r
+	-- r is used to determine whether a collision will be ignored
+	r = robot.random.bernoulli(0.9)
 
-	end
-end
+		if (collisionLeft == 1) then
 
-if (collisionRight == 1) then
-	--robot.wheels.set_velocity(-x_Velo,y_Velo)
-
-	--log("r : " .. r)
-	if (r == 1) then
-		k = 17
-	end
-	if (k == 17) or ( k == 16) or (k == 15)then
-		--log("k : " ..k)
-		collisionRight = 0
-		collision = 0;
-	end
-
-	-- perhaps the other way arround - left
-	r = robot.random.bernoulli(0.05)
-	if (r == 1) then
-		--log("perhaps left")
-		robot.wheels.set_velocity(x_Velo,-y_Velo/4)
-		--robot.leds.set_all_colors("yellow")
-	end
-end
-
-if (nobodyThere(proximity_table) == 1) then
-		collisionLeft = 0
-		collisionRight = 0
-		collision = 0
-end
-
-
-
-end
-
-
-function collisionDetection()
--- DETECT
-
-
-
-if(collision == 0) then
-	--robot.wheels.set_velocity(0,0)
-
-	closeValueRight =  proximity_table[24].value +  proximity_table[23].value  +  proximity_table[22].value + proximity_table[21].value + proximity_table[20].value
-	closeValueLeft =   proximity_table[1].value + proximity_table[2].value + proximity_table[3].value + proximity_table[4].value + proximity_table[5].value
-
-	maxValue = closeValueLeft + closeValueRight
-	--log("Max Value : " .. maxValue)
-	if (maxValue > 0.02) then
-		if (closeValueLeft >= closeValueRight) then -- left
-			collisionLeft = 1
-			collisionRight = 0
-			collision = 1
-			robot.wheels.set_velocity(30/2,-30/4)
-			--robot.leds.set_all_colors("yellow")
-
-		else -- right
-			collisionRight = 1
-			collisionLeft = 0
-			collision = 1
-			robot.wheels.set_velocity(-30/4,30/2)
-			--robot.leds.set_all_colors("red")
-		end
-
-	else
-		collisionLeft = 0
-		collisionRight = 0
-		collision = 0
-
-		setSpeed(leftSpeed, 0)
-		--[[
-		curve = robot.random.uniform()
-		direct = robot.random.bernoulli(0.5)
-		doIt = robot.random.bernoulli(0.3)
-		if (doIt == 1) then
-			if(direct == 1) then
-				robot.wheels.set_velocity(curve * x_Velo, y_Velo)
-			else
-				robot.wheels.set_velocity(x_Velo, curve * y_Velo)
+			-- ignore according to r a front collisions
+			if (r == 1) then
+				k = 14
+			end
+			-- ignore all collisions from behind
+			-- the robot behind will handle this
+			if (k == 12) or ( k == 13) or (k == 14)then
+				collisionLeft = 0
+				collision = 0;
 			end
 
-			--robot.leds.set_all_colors("white")
+			-- perhaps the other way arround - right
+			-- good for situations where a robot get stuck (e.g. corners)
+			r = robot.random.bernoulli(0.05)
+			if (r == 1) then
+
+				robot.wheels.set_velocity(-x_Velo/4,y_Velo)
+
+
+			end
 		end
-		]]
-	end
+
+
+		-- same behavior as for the left side
+		if (collisionRight == 1) then
+
+			if (r == 1) then
+				k = 17
+			end
+			if (k == 17) or ( k == 16) or (k == 15) then
+
+				collisionRight = 0
+				collision = 0;
+			end
+
+			-- perhaps the other way arround - left
+			r = robot.random.bernoulli(0.05)
+			if (r == 1) then
+
+				robot.wheels.set_velocity(x_Velo,-y_Velo/4)
+
+			end
+		end
+
+
+		-- if there is no robot we assume that the collision was somehow
+		-- already handled by something
+		if (nobodyThere(proximity_table) == 1) then
+				collisionLeft = 0
+				collisionRight = 0
+				collision = 0
+		end
+
 	end
 
 end
+
+
+
+-- Detect collisions on the left and right side
+-- Both sides consider also the front proximity sensors
+function collisionDetection()
+
+
+
+	-- DETECT
+	if(collision == 0) then
+
+		-- helper varaibles for the proximity values of the anterior left and right proxmity values
+		closeValueRight =  proximity_table[24].value +  proximity_table[23].value  +  proximity_table[22].value + proximity_table[21].value + proximity_table[20].value
+		closeValueLeft =   proximity_table[1].value + proximity_table[2].value + proximity_table[3].value + proximity_table[4].value + proximity_table[5].value
+
+		maxValue = closeValueLeft + closeValueRight
+
+		-- check the sum of left and right whether there is a collsion
+		-- next check if it is left or right
+		if (maxValue > 0.02) then
+			if (closeValueLeft >= closeValueRight) then -- left
+				collisionLeft = 1
+				collisionRight = 0
+				collision = 1
+				robot.wheels.set_velocity(30/2,-30/4)
+				--robot.leds.set_all_colors("yellow")
+
+			else -- right
+				collisionRight = 1
+				collisionLeft = 0
+				collision = 1
+				robot.wheels.set_velocity(-30/4,30/2)
+				--robot.leds.set_all_colors("red")
+			end
+
+		else
+			collisionLeft = 0
+			collisionRight = 0
+			collision = 0
+
+			setSpeed(leftSpeed, 0)
+			--[[
+			curve = robot.random.uniform()
+			direct = robot.random.bernoulli(0.5)
+			doIt = robot.random.bernoulli(0.3)
+			if (doIt == 1) then
+				if(direct == 1) then
+					robot.wheels.set_velocity(curve * x_Velo, y_Velo)
+				else
+					robot.wheels.set_velocity(x_Velo, curve * y_Velo)
+				end
+
+				--robot.leds.set_all_colors("white")
+			end
+			]]
+		end
+
+	end
 
 end
 
@@ -931,7 +1025,7 @@ return count end
 
 
 
-
+-- Sums up the data in the ith byte of the range and bearing tables
 function count_message_recieved_in(i)
 	local t = robot.range_and_bearing
 	local count = 0
@@ -939,25 +1033,19 @@ function count_message_recieved_in(i)
 	for key,tab in pairs(t) do
 
 		if(type(tab) == "table") then
---			log("Key : " .. key)
-			--log("Table : " .. tab)
---			log("Type : " .. type(tab))
-			--log("Range: ")
-			--log(tab.range)
-			count = count + tab.data[i]
-			--[[
-			for k,val in pairs(tab.data) do
-				log("Data Key : " .. k)
-				log("Data Val : " .. val)
 
-			end
-			--]]
+			count = count + tab.data[i]
+
 		end
 
-   	end
-	-- log("Count : " .. count)
+  end
+
 return count end
 
+
+-- Calculate the number of recieved tables over range and bearing
+-- Since every robots sends some data over range and bearing,
+-- the calculated number is equal to the robots in range
 function count_message_recieved()
 	local t = robot.range_and_bearing
 	local count = 0
@@ -965,36 +1053,28 @@ function count_message_recieved()
 	for key,tab in pairs(t) do
 
 		if(type(tab) == "table") then
---			log("Key : " .. key)
-			--log("Table : " .. tab)
---			log("Type : " .. type(tab))
-			--log("Range: ")
-			--log(tab.range)
-			count = count + 1
-			--[[
-			for k,val in pairs(tab.data) do
-				log("Data Key : " .. k)
-				log("Data Val : " .. val)
 
-			end
-			--]]
+			count = count + 1
+
 		end
 
-   	end
-	-- log("Count : " .. count)
+  end
+
 return count end
 
+
+-- Calculating force with the lennard jones method
 function lennard_jones(range, target, eps)
 	local force = 0
 	local temp = math.pow(target / range, 2)
 	force = -4*eps/range * ( math.pow(temp,2) - temp)
 
-
 return force end
 
 
 
-
+-- Set the velocity to speed and turn speed
+-- values which were calculated according to a force
 function setForceSpeed(speed, turnSpeed)
 	local leftSpeed = speed
 	local rightSpeed = speed
@@ -1003,16 +1083,16 @@ function setForceSpeed(speed, turnSpeed)
 	leftSpeed = leftSpeed - turnSpeed
 	rightSpeed = rightSpeed + turnSpeed
 
-
-
 	robot.wheels.set_velocity(leftSpeed, rightSpeed)
 
 
 end
 
 
-function patternExpand()
 
+-- Robots in the chain will expand its distance according
+-- to the range and bearing values of chain members
+function patternExpand()
 
 
 	local t = robot.range_and_bearing
@@ -1023,37 +1103,25 @@ function patternExpand()
 	for key,tab in pairs(t) do
 
 		if(type(tab) == "table") then
---			log("Key : " .. key)
-			--log("Table : " .. tab)
---			log("Type : " .. type(tab))
-			--log("Range: ")
-			--log(tab.range)
+
 			-- is it a green, red or blue chain member than calculate the force
 			if (tab.data[1] == 1) or (tab.data[2] == 1) or (tab.data[3] == 1) then
-			--	log ("HB : " .. tab.horizontal_bearing)
-			--	log ("Range : " .. tab.range)
+
 				local hb = tab.horizontal_bearing
 				local range = tab.range
 				local force =  lennard_jones(range, dTarget, epsilon)
 
 				local temp_x = force * math.cos(hb)
 				local temp_y = force * math.sin(hb)
-				--log("x : " .. temp_x)
-				--log("y : " .. temp_y)
+
 				x = x + temp_x
 				y = y + temp_y
 
-			end -- end if chain member
-			--[[
-			for k,val in pairs(tab.data) do
-				log("Data Key : " .. k)
-				log("Data Val : " .. val)
-
 			end
-			--]]
 		end -- end if table has correct format
 
 	end -- end for
+
 	-- log("Count : " .. count)
 	--log("Total x : " .. x)
 	--log("Total y : " .. y)
@@ -1094,9 +1162,8 @@ function patternExpand()
 
 
 	angle = math.atan2(y,x)
-	--log("Angle : " .. angle)
 
-
+	-- correct angle according to the robot's x y plane
 	if (angle >= math.pi) then
 		turnSpeed = (math.pi*2 - angle) * -1
 	else
@@ -1105,13 +1172,12 @@ function patternExpand()
 	turnSpeed = (turnSpeed * 10) / math.pi
 
 	local length = math.sqrt( math.pow(x,2) +  math.pow(y,2))
-	--log("Length : " .. length)
+
 	local normLength = length / maxLength
 
 	if (normLength > 1) then
 		normLength = 1
 	end
 
-	--log("Force Speed" ..turnSpeed)
 	setForceSpeed(x_Velo/3 * normLength, turnSpeed)
 end
