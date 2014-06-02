@@ -75,7 +75,7 @@ maxLength = dTarget / 8
 
 -- exploration along chain
 
-chain_dTarget = 60
+chain_dTarget = 80
 chain_epsilon = 60000
 
 
@@ -231,6 +231,20 @@ function chain_position_decision()
 
 		b_leaves_chain = 2
 
+
+		if (valid_chain_member == 0) then
+
+			chain_color = 0
+			valid_chain_member = 0
+			robot.in_chain = 0
+			-- still not a valid chain member than test if the robot found the prey
+			if (isOnPrey() == false) then
+				reset_all()
+				behavior_change(b_exploration)
+			end
+
+		end
+
 	end
 
 end
@@ -330,7 +344,7 @@ function step_b_chain()
 				leave_chain_decision()
 			end
 
-			if (groundIsWhite < 0.90) and (count_chain_sum > 2) then
+			if (groundIsWhite < 0.90)  then
 
 				leave_chain_decision()
 			end
@@ -351,7 +365,8 @@ function step_b_chain()
 		-- if robot is tail and not used by other robots to explore
 		if ( isTail() == true ) and ( count_message_recieved() > 0 ) then
 
-			--leave_chain_decision()
+			--leave_chain_stigma = leave_chain_stigma + robot.random.uniform()
+			--leave_chain_stigma = leave_chain_stigma + 1  -- for tail
 
 		end
 
@@ -427,14 +442,20 @@ function step_b_exploration()
 	end
 
 
-	if (isTail() == true) and (groundIsWhite >= 0.95) then
+	-- calculate probability for become a chain member
+
+	p_chain = robot.random.uniform() - ( math.pow( ( 1 + count_chain_sum ), 2 ) /  ( math.pow( ( 1 +  count_messages_sum), 2 ) ) ) - 4*(1 - groundIsWhite)
+	p_chain = p_chain / 2
+
+
+	--if (isTail() == true) and (groundIsWhite >= 0.95) then
 		r_chain = robot.random.uniform()
 		--log("r_chain" .. r_chain)
 		--log("p_chain" .. p_chain)
-		if (r_chain >= p_chain) then
+		if (r_chain <= p_chain) then
 			behavior_change(b_chain)
 		end
-	end
+	--end
 
 	-- look for prey
 	isOnPrey()
@@ -450,7 +471,7 @@ function step_b_exploration()
 end
 
 function behavior_change(new_behavior)
-	wait_time = robot.random.uniform() * 20 + 2
+	wait_time = robot.random.uniform() * 10 + 1
 	--log("wait_time" .. wait_time)
 	behavior = new_behavior
 end
@@ -466,6 +487,8 @@ function step()
 	count_blue_members = count_message_recieved_in(3)
 	count_prey_members = count_message_recieved_in(4)
 	count_chain_sum = count_green_members + count_blue_members + count_red_members
+
+	count_messages_sum = count_message_recieved()
 
 	groundIsWhite = robot.motor_ground[1].value + robot.motor_ground[2].value + robot.motor_ground[3].value + robot.motor_ground[4].value
 
@@ -488,7 +511,7 @@ function step()
 
 
 			-- start explore if you have left the nest, or there is a chain member or a nest keeper
-			if ( groundIsWhite == 1 ) or (count_chain_sum > 0) or (count_prey_members > 0) then
+			if ( groundIsWhite == 1 ) or (count_chain_sum < 0) or (count_prey_members > 0) then
 
 				behavior_change(b_exploration)
 			end
@@ -628,6 +651,40 @@ function exploration_along_chain()
 	  end
 
 	end
+
+
+	local groundTab = table.copy(robot.motor_ground)
+
+	for key,tab in pairs(groundTab) do
+
+		if(type(tab) == "table") then
+
+			-- is it a green, red or blue chain member than calculate the force
+			if (tab.value >= 0.01) then
+			--	log ("HB : " .. tab.horizontal_bearing)
+			--	log ("Range : " .. tab.range)
+				--local hb = tab.offset
+				local range = tab.value * 100
+				local force =  lennard_jones(range, chain_dTarget * 10, chain_epsilon * 10)
+
+				local temp_x = force * tab.offset.x
+				local temp_y = force * tab.offset.y
+				log("x : " .. temp_x)
+				log("y : " .. temp_y)
+				x = x + temp_x
+				y = y + temp_y
+
+			end -- end if chain member
+			--[[
+			for k,val in pairs(tab.data) do
+				log("Data Key : " .. k)
+				log("Data Val : " .. val)
+
+			end
+			--]]
+		end -- end if table has correct format
+
+	end -- end for
 
 
 		-- local proxTab = table.copy(proximity_table)
