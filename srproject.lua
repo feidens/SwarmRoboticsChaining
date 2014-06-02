@@ -100,7 +100,7 @@ maxLength = dTarget / 8
 collision = 0
 collisionLeft = 0
 collisionRight = 0
-e ust t   nt
+
 
 --- com overview
 comData={
@@ -671,61 +671,33 @@ function exploration_along_chain()
 		for key,tab in pairs(t) do
 
 			if(type(tab) == "table") then
-				--log("Key : " .. key)
-				--log("Table : " .. tab)
-				--log("Type : " .. type(tab))
-				--log("Range: ")
-				--log(tab.range)
-				if (tab.data[1] == 1) or (tab.data[2] == 1) or (tab.data[3] == 1) then
-				--	log ("HB : " .. tab.horizontal_bearing)
-				--	log ("Range : " .. tab.range)
 
-					--log("Lastseen " .. lastSeenID)
+				if (tab.data[1] == 1) or (tab.data[2] == 1) or (tab.data[3] == 1) then
+
 					local hb = tab.horizontal_bearing
 					range = tab.range
 					local lennardJones =  lennard_jones(range, chain_dTarget, chain_epsilon )
-					--log("leanrd" .. lennardJones)
+
 					local temp_x = math.cos(hb)
 					local temp_y = math.sin(hb)
 
 					local temp_angle = math.atan2(temp_y,temp_x)
 
-					--log("temp_angle " .. temp_angle)
 
 					if (temp_angle <= math.pi/2) and (temp_angle >= -math.pi/2) then
-						-- local alpha = 1
-						-- if (tab.data[5] ~= 0) then
-						-- 	alpha = tab.data[5]
-						-- end
-						-- log(alpha)
+
 						temp_x =  lennardJones * math.cos(hb)
 						temp_y =  lennardJones * math.sin(hb)
 
-						--log("Range " .. range)
-						--if (range >= 5) then
 
-							x = x + temp_x
-							y = y + temp_y
+						x = x + temp_x
+						y = y + temp_y
 
-							--log("YESSSSSS")
-						--end
-				--	else
-						--log("NOOOOOO")
+
 					end
 
-
-					--log("x : " .. temp_x)
-					--log("y : " .. temp_y)
-
-
 				end
-				--[[
-				for k,val in pairs(tab.data) do
-					log("Data Key : " .. k)
-					log("Data Val : " .. val)
 
-				end
-				--]]
 			end
 
 	  end
@@ -802,9 +774,9 @@ function exploration_along_chain()
 
 
 		angle = math.atan2(y,x)
-		--log("Angle : " .. angle)
 
 
+		-- correct angle according to the robot's x y plane
 		if (angle >= math.pi) then
 			turnSpeed = (math.pi*2 - angle) * -1
 		else
@@ -813,18 +785,15 @@ function exploration_along_chain()
 		turnSpeed = (turnSpeed * 8) / math.pi
 
 		local length = math.sqrt( math.pow(x,2) +  math.pow(y,2))
-		--log("Length : " .. length)
+
 		local normLength = length / maxLength
 
 		if (normLength > 1) then
 			normLength = 1
 		end
-		-- log("TURN BY: " .. turnSpeed)
-		setForceSpeed(x_Velo , turnSpeed )
-	--else
 
-	--	setForceSpeed(x_Velo, 0)
-	--end
+		setForceSpeed(x_Velo , turnSpeed )
+
 end
 
 
