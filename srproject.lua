@@ -27,7 +27,6 @@ b_prey = 3
 behavior = b_exploration
 behavior_old = b_exploration
 
-b_leaves_chain = 0
 
 wait_time = 0
 wait_chain_time = 0
@@ -162,6 +161,7 @@ end
 
 
 
+-- seet velocity of robot
 function setSpeed(speed, turnSpeed)
 
 	leftSpeed = speed
@@ -193,6 +193,7 @@ function setSpeed(speed, turnSpeed)
 end
 
 
+-- Returns true if the robot is the tail of a chain
 function isTail()
 
 	-- robot is tail if it recieves only one chain member
@@ -206,38 +207,35 @@ function isTail()
 return false end
 
 
+
+-- Decides to which position in the chain the robot will be assigned to
 function chain_position_decision()
+
+
+	-- We decide on a appropriate signal for the relative
+	-- position in the chain
 
 	if (valid_chain_member == 0) then
 
-		--log("CHAIN_DECISISON")
 
-		if (count_green_members == 0) and (count_red_members == 0) and (count_blue_members == 1) or (count_chain_sum == 0) then -- end of the chain -> green
+		if (count_green_members == 0) and (count_red_members == 0) and (count_blue_members == 1) or (count_chain_sum == 0) then -- green
 			chain_color = color_green
 			valid_chain_member = 2
 			wait_chain_time = robot.random.uniform() * robot.random.uniform()  + 1
-			--log("wait_chain_time" .. wait_chain_time)
-			--log("green")
-
 		end
 
-		if(count_green_members == 1) and (count_red_members == 0) and (count_blue_members == 0) then -- end of the chain
+		if(count_green_members == 1) and (count_red_members == 0) and (count_blue_members == 0) then -- red
 			chain_color = color_red
 			valid_chain_member = 2
 			wait_chain_time = robot.random.uniform() * robot.random.uniform()  + 1
-			--log("wait_chain_time" .. wait_chain_time)
-			--log("red")
 		end
 
-		if(count_green_members == 0) and (count_red_members == 1) and (count_blue_members == 0) then -- end of the chain
+		if(count_green_members == 0) and (count_red_members == 1) and (count_blue_members == 0) then -- blue
 			chain_color = color_blue
 			valid_chain_member = 2
 			wait_chain_time = robot.random.uniform() * robot.random.uniform()  + 1
-		--log("wait_chain_time" .. wait_chain_time)
-		--log("blue")
 		end
 
-		b_leaves_chain = 2
 
 
 		if (valid_chain_member == 0) then
@@ -257,10 +255,12 @@ function chain_position_decision()
 
 end
 
+
+-- set chain position if there is no other robot with the same color
 function set_chain_position()
 
-	--log("SET CHAIN POSITION" ..chain_color)
-
+	-- We set a appropriate signal for the relative
+	-- position in the chain
 
 	if (chain_color == color_green ) and (count_green_members == 0) then
 
@@ -269,7 +269,6 @@ function set_chain_position()
 		valid_chain_member = 1
 		robot.in_chain = 1
 		setSpeed(0,0)
-		--log("GREEN")
 	end
 
 	if (chain_color == color_red ) and ( count_red_members == 0 ) then
@@ -279,7 +278,6 @@ function set_chain_position()
 		valid_chain_member = 1
 		robot.in_chain = 1
 		setSpeed(0,0)
-		--log("RED")
 	end
 
 	if (chain_color == color_blue ) and ( count_blue_members == 0 )then
@@ -289,11 +287,9 @@ function set_chain_position()
 		valid_chain_member = 1
 		robot.in_chain = 1
 		setSpeed(0,0)
-		--log("BLUE")
 	end
 
 	if (valid_chain_member == 2) then
-
 		chain_color = 0
 		valid_chain_member = 0
 		robot.in_chain = 0
@@ -307,21 +303,27 @@ function set_chain_position()
 
 end
 
+
+
+
+-- Execute chain behavior
+-- Robot will leave this behavior depending on the following conditions:
+-- If the robot is on the prey the behavior will be changed to b_prey
 function step_b_chain()
-	-- first we have to set an appropriate signal for the relative
-	-- prosition in the chain
 
 
-
+	-- wait time after a decision on the chain position was made
 	if(wait_chain_time >1) then
 		wait_chain_time = wait_chain_time - 1
 	else
 
+		-- If the robot still has no valid relative position in the chain
 		if (valid_chain_member == 0) and (behavior == b_chain) then
 
 			chain_position_decision()
 
 		end
+		-- set position according to the previous made decision
 		set_chain_position()
 
 
@@ -331,12 +333,13 @@ function step_b_chain()
 
 
 
-
-	if (valid_chain_member == 1) then -- expand distance
+	-- if the robot has a valid relative position in the chain
+	-- leave the chain if there are other robots with the same position
+	-- recognized by color and data send over range and bearing sensors
+	if (valid_chain_member == 1) then
 
 		-- look if there is another robot with the same color
-		-- if this is true than flip a coin to leave the chain
-
+		-- if this is true than draw a random number to leave the chain
 			if (chain_color == color_green ) and (count_green_members > 0) then
 
 				leave_chain_decision()
@@ -352,6 +355,9 @@ function step_b_chain()
 				leave_chain_decision()
 			end
 
+			-- Big chains in the nest are not neccessary
+			-- Because it is the nest that we want to leave
+			-- and connect to the preys with a chain
 			if (groundIsWhite < 0.90)  then
 
 				leave_chain_decision()
@@ -359,13 +365,16 @@ function step_b_chain()
 
 
 
-
+		-- expand the distance to the other chain members
+		-- we use a force calculated with the lennard jones method to
+		-- achieve this pattern
 		if (count_chain_sum >=1) then
 
 			patternExpand()
 
 
 		else
+			-- chain is not build longer than one robot than wait
 			setSpeed(0,0)
 		end
 
@@ -414,27 +423,28 @@ function step_b_chain()
 
 end
 
+
+-- Decide if the robot should leave the chain
 function leave_chain_decision()
 
-	-- decide if it should leave the chain
 
---	if (isTail() == 1 and groundIsWhite >=0.9) then
+
 		r_leave = robot.random.uniform()
-		--log("r_leave" .. r_leave)
-		--log("p_leave" .. p_leave)
+
 		if (r_leave < p_leave) then
 			reset_all()
 			robot.wheels.set_velocity(30,30)
-			b_leaves_chain = 1
 			behavior_change(b_exploration)
 		end
 
---	end
+
 
 end
 
 
-
+-- Test and reaction on the presence of a prey
+-- Change behavior to b_prey (Prey behavior) if prey
+-- is under the robot
 function isOnPrey()
 
 	-- only one per prey
@@ -452,6 +462,8 @@ function isOnPrey()
 end
 
 
+
+-- Resets state to pre exploration behavior
 function reset_all()
 	robot.range_and_bearing.set_data(3, 0)
 	robot.range_and_bearing.set_data(2, 0)
@@ -465,6 +477,10 @@ function reset_all()
 end
 
 
+-- Executes exploration behavior
+-- Robot explores along chain and calculate probability
+-- to participate in the chain as a chain member and therefore
+-- changes to b_chain (Chain behavior)
 function step_b_exploration()
 
 
@@ -478,10 +494,12 @@ function step_b_exploration()
 	end
 
 
-
+	-- calculate probability to participate in perceived chain
 	calcPChain()
 
-
+	-- draw a random value r_chain and
+	-- change behavior to chain behavior if
+	-- r_chain <= p_chain
 	r_chain = robot.random.uniform()
 	if (r_chain <= p_chain) then
 		behavior_change(b_chain)
@@ -494,19 +512,14 @@ function step_b_exploration()
 	isOnNest()
 
 
-	-- avoid nest after
-	-- if ( groundIsWhite > 0.1 ) and ( groundIsWhite < 0.9 ) then
-	-- 	collisionLeft = 1
-	-- 	collisionRight = 0
-	-- 	collision = 1
-	-- end
-
 
 end
 
+
+-- Calculates probability for become a chain member
 function calcPChain()
 
-	-- calculate probability for become a chain member
+
 
 	p_chain = robot.random.uniform() - ( math.pow( ( 1 + count_chain_sum ), 2 ) /  ( math.pow( ( 1 +  count_messages_sum), 2 ) ) ) - 10 * (1 - groundIsWhite)
 	p_chain = p_chain / 2
@@ -514,6 +527,7 @@ function calcPChain()
 end
 
 
+-- Calculates probability for become a nest keeper
 function calcPNest()
 
 	local nestGround = 1
@@ -525,6 +539,10 @@ function calcPNest()
 
 end
 
+
+-- Test and reaction on the presence of a nest
+-- Change behavior to b_nest (Nest behavior) if nest
+-- is under the robot
 function isOnNest()
 
 	calcPNest()
@@ -550,6 +568,9 @@ function behavior_change(new_behavior)
 
 	behavior = new_behavior
 end
+
+
+
 
 --[[ This function is executed at each time step
      It must contain the logic of your controller ]]
