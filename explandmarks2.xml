@@ -8,7 +8,7 @@
     <!-- To make ARGoS faster, you can set 'threads' to some number greater than 0 -->
     <system threads="8" />
     <!-- To change the random seed for each experiment repetition, you can set 'random_seed' to whatever value you like -->
-    <experiment length="100000" ticks_per_second="10" random_seed="ReplaceFirst" />
+    <experiment length="0" ticks_per_second="10" random_seed="ReplaceFirst" />
   </framework>
 
   <!-- ****************** -->
@@ -43,10 +43,10 @@
         <range_and_bearing implementation="medium" medium="rab" show_rays="true" />
       </sensors>
       <!-- If you want to execute ARGoS with an empty script, use this syntax -->
-
+      <params />
       <!-- If you want to execute ARGoS with a script preloaded, use this syntax
            Note: the preloaded script does not appear in the Lua editor! (that's a TODO) -->
-      <params script="srproject.lua" />
+      <!-- params script="my_script.lua" / -->
     </lua_controller>
   </controllers>
 
@@ -84,7 +84,7 @@
       <entity quantity="40" max_trials="10" base_num="1">
         <!-- You can play with the range of the range and bearing system changing the 'rab_range' attribute
              NOTE: here it is expressed in meters, while in the controller you'll work in cm! -->
-        <foot-bot id="rescuer" rab_range="1.5" controller="controller" />
+        <foot-bot id="rescuer" rab_range="2.5" controller="controller" />
       </entity>
     </distribute>
   </arena>
@@ -108,12 +108,12 @@
   <!-- ****************** -->
   <visualization>
     <!-- To execute ARGoS in batch without visualization, just comment out the 'qt-opengl' section
-
+    -->
     <qt-opengl lua_editor="true">
       <camera>
         <placement idx="0" position="-0.430336,-0.338533,9.65303" look_at="-0.430292,-0.283162,8.65457" lens_focal_length="20" />
       </camera>
-    </qt-opengl>-->
+    </qt-opengl>
   </visualization>
 
 </argos-configuration>

@@ -9,7 +9,7 @@ p_leave = 1 - p_chain     -- prob. threshold to leave a chain as last member of 
 p_search = p_chain / 3    -- prob. threshold to abort exploration and search nest or prey (Explore -> Search)
 p_nest = 0
 
-leave_chain_stigma = -1000
+leave_chain_stigma = -200
 
 tail_stigma = 0
 
@@ -219,22 +219,34 @@ function chain_position_decision()
 	if (valid_chain_member == 0) then
 
 
-		if (count_green_members == 0) and (count_red_members == 0) and (count_blue_members == 1) or (count_chain_sum == 0) then -- green
-			chain_color = color_green
-			valid_chain_member = 2
-			wait_chain_time = robot.random.uniform() * robot.random.uniform()  + 1
+		if (count_green_members == 0) then -- no green
+			if ( (count_blue_members == 1) or (count_chain_sum == 0) ) then -- green after blue
+				chain_color = color_green
+				valid_chain_member = 2
+				wait_chain_time = robot.random.uniform() * robot.random.uniform()  + 1
+			end
+			if ( (count_red_members == 1) and (count_blue_members == 0)  ) then -- blue
+				chain_color = color_blue
+				valid_chain_member = 2
+				wait_chain_time = robot.random.uniform() * robot.random.uniform()  + 1
+
+			end
 		end
 
-		if(count_green_members == 1) and (count_red_members == 0) and (count_blue_members == 0) then -- red
-			chain_color = color_red
-			valid_chain_member = 2
-			wait_chain_time = robot.random.uniform() * robot.random.uniform()  + 1
+		if (count_red_members == 0) then -- red
+			if ( (count_blue_members == 1) or (count_green_members == 1) ) then
+				chain_color = color_red
+				valid_chain_member = 2
+				wait_chain_time = robot.random.uniform() * robot.random.uniform()  + 1
+			end
 		end
 
-		if(count_green_members == 0) and (count_red_members == 1) and (count_blue_members == 0) then -- blue
-			chain_color = color_blue
-			valid_chain_member = 2
-			wait_chain_time = robot.random.uniform() * robot.random.uniform()  + 1
+		if ( count_blue_members == 0 ) then -- blue
+			if ( (count_green_members == 1) and (count_red_members == 0) ) then
+				chain_color = color_blue
+				valid_chain_member = 2
+				wait_chain_time = robot.random.uniform() * robot.random.uniform()  + 1
+			end
 		end
 
 
@@ -444,10 +456,11 @@ function leave_chain_decision()
 			reset_all()
 			robot.wheels.set_velocity(30,30)
 			behavior_change(b_exploration)
+			return true
 		end
 
 
-
+		return false
 end
 
 
@@ -824,13 +837,13 @@ function exploration_along_chain()
 
 		local length = math.sqrt( math.pow(x,2) +  math.pow(y,2))
 
-		log(length)
+
 		local normLength = 1 - length / chain_dTarget
-		log(normLength)
+
 		if (normLength < 0.5) then
 			normLength = 0.5
 		end
-		log(normLength)
+	
 		setForceSpeed(x_Velo * normLength, turnSpeed )
 
 end
