@@ -9,6 +9,7 @@ p_leave = 1 - p_chain     -- prob. threshold to leave a chain as last member of 
 p_search = p_chain / 3    -- prob. threshold to abort exploration and search nest or prey (Explore -> Search)
 p_nest = 0
 
+leave_chain_stigma = -1000
 
 tail_stigma = 0
 
@@ -74,7 +75,7 @@ y_Velo = 30
 
 
 -- pattern
-dTarget = 300
+dTarget = 20
 epsilon = 50
 maxLength = dTarget / 8
 
@@ -358,10 +359,10 @@ function step_b_chain()
 			-- Big chains in the nest are not neccessary
 			-- Because it is the nest that we want to leave
 			-- and connect to the preys with a chain
-			if (groundIsWhite < 0.90)  then
-
-				leave_chain_decision()
-			end
+			-- if (groundIsWhite < 0.90)  then
+			--
+			-- 	leave_chain_decision()
+			-- end
 
 
 
@@ -393,12 +394,20 @@ function step_b_chain()
 
 
 		-- if robot is tail and not used by other robots to explore
-		if ( isTail() == true ) and ( count_message_recieved() > 0 ) then
+		if ( isTail() == true ) then
 
-			--leave_chain_stigma = leave_chain_stigma + robot.random.uniform()
-			--leave_chain_stigma = leave_chain_stigma + 1  -- for tail
+			leave_chain_stigma = leave_chain_stigma - robot.random.uniform() * count_messages_sum
+			leave_chain_stigma = leave_chain_stigma + 2  -- for tail
+
+		else
+
+			leave_chain_stigma = leave_chain_stigma - 2 -- for not tail
+
 
 		end
+
+
+
 
 		-- -- calculate probability for leave chain
 		-- p_leave_chain = robot.random.uniform() + ( math.pow( ( 1 + count_chain_sum ), 2 ) /  ( math.pow( ( 1 +  count_messages_sum), 2 ) ) ) - 4*(1 - groundIsWhite)
@@ -407,13 +416,13 @@ function step_b_chain()
 		--
 		--
 		--
-		-- r_chain = robot.random.uniform()
-		-- --log("r_chain" .. r_chain)
-		-- --log("p_chain" .. p_chain)
-		-- if (r_chain <= p_leave_chain) then
-		-- 	behavior_change(b_exploration)
-		-- end
-		--
+		r_leave = robot.random.uniform()
+		--log("r_chain" .. r_chain)
+		--log("p_chain" .. p_chain)
+		if (r_chain <= p_chain) and (leave_chain_stigma > 1000) then
+			behavior_change(b_exploration)
+		end
+
 
 	end
 
@@ -516,27 +525,32 @@ function step_b_exploration()
 end
 
 
+
+
 -- Calculates probability for become a chain member
 function calcPChain()
 
 
 
-	p_chain = robot.random.uniform() - ( math.pow( ( 1 + count_chain_sum ), 2 ) /  ( math.pow( ( 1 +  count_messages_sum), 2 ) ) ) - 10 * (1 - groundIsWhite)
+	p_chain = robot.random.uniform() -  ( math.pow( ( 1 + count_chain_sum ), 2 ) /  ( math.pow( ( 1 +  count_messages_sum), 2 ) ) ) - 10 * (1 - groundIsWhite)
 	p_chain = p_chain / 2
+
 
 end
 
 
--- Calculates probability for become a nest keeper
+-- Calculates value for become a nest keeper
 function calcPNest()
 
 	local nestGround = 1
 	if (groundIsWhite > 0.80) then -- ignore Prey spot
 		nestGround = groundIsWhite
 	end
-	p_nest = - (1 - ( math.pow( ( 1 + count_prey_members ), 2 ) /  ( math.pow( ( 1 +  count_messages_sum), 2 ) ) ) ) +  2 * (1 - nestGround)
-	p_nest = p_nest / 2
-
+	--p_nest =  (1/( math.pow( ( 1 + count_prey_members ), 2 ) /  ( math.pow( ( 1 +  count_messages_sum), 2 ) ) ) ) * 10 * (1 - nestGround)
+	p_nest = p_nest + (1-2*count_prey_members) - nestGround
+	--p_nest = p_nest / 2
+	--p_nest = math.max(p_nest, 0)
+	--p_nest = math.min(p_nest, 1)
 end
 
 
@@ -547,10 +561,10 @@ function isOnNest()
 
 	calcPNest()
 
-	r_nest = robot.random.uniform()
+	--r_nest = robot.random.uniform()
 	--log("r_chain" .. r_chain)
 	--log("p_chain" .. p_chain)
-	if (r_nest <= p_nest) then
+	if (200 <= p_nest) then
 
 		robot.range_and_bearing.set_data(4, 1)
 		robot.leds.set_all_colors("white")
@@ -596,6 +610,9 @@ function step()
 	-- helper variable for the ground value, 0 == black, 1 == white
 	groundIsWhite = robot.motor_ground[1].value + robot.motor_ground[2].value + robot.motor_ground[3].value + robot.motor_ground[4].value
 	groundIsWhite = groundIsWhite / 4
+
+
+	updateMaxRange()
 
 	-- wait before the next behavior is activated
 	if(wait_time >1) then
@@ -654,7 +671,7 @@ function step_b_nest()
 	r_nest = robot.random.uniform()
 	--log("r_chain" .. r_chain)
 	--log("p_chain" .. p_chain)
-	if (r_nest >= 1-p_nest) then
+	if (20 > p_nest) then
 		reset_all()
 		setSpeed(x_Velo, 0)
 		behavior_change(b_exploration)
@@ -1079,6 +1096,20 @@ function setForceSpeed(speed, turnSpeed)
 end
 
 
+function updateMaxRange()
+	local t = robot.range_and_bearing
+
+
+	for key,tab in pairs(t) do
+
+		if(type(tab) == "table") then
+
+			dTarget = math.max( tab.range ,  dTarget)
+
+		end
+
+	end
+end
 
 -- Robots in the chain will expand its distance according
 -- to the range and bearing values of chain members
