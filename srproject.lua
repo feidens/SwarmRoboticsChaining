@@ -83,8 +83,8 @@ maxLength = dTarget / 8
 
 -- exploration along chain
 
-chain_dTarget = 60
-chain_epsilon = 9000
+chain_dTarget = 50
+chain_epsilon = 50
 
 
 
@@ -397,7 +397,7 @@ function step_b_chain()
 		if ( isTail() == true ) then
 
 			leave_chain_stigma = leave_chain_stigma - robot.random.uniform() * count_messages_sum
-			leave_chain_stigma = leave_chain_stigma + 2  -- for tail
+			leave_chain_stigma = leave_chain_stigma + 2  + 20 * (1- groundIsWhite)-- for tail
 
 		else
 
@@ -824,13 +824,14 @@ function exploration_along_chain()
 
 		local length = math.sqrt( math.pow(x,2) +  math.pow(y,2))
 
-		local normLength = length / maxLength
-
-		if (normLength > 1) then
-			normLength = 1
+		log(length)
+		local normLength = 1 - length / chain_dTarget
+		log(normLength)
+		if (normLength < 0.5) then
+			normLength = 0.5
 		end
-
-		setForceSpeed(x_Velo , turnSpeed )
+		log(normLength)
+		setForceSpeed(x_Velo * normLength, turnSpeed )
 
 end
 
