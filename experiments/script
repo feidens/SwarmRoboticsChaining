@@ -1,0 +1,55 @@
+#!/bin/bash
+
+
+
+
+
+# Helper Function to copy the template files
+function createFile {
+    UPPERCASE="$(tr '[:lower:]' '[:upper:]' <<< ${3:0:1})${3:1}";
+    ESCAPED=$(sed 's/[\*\.]/\\&/g' <<<"$CTMP")
+    sed "s/ReplaceFirst/${3}/g" ${1} > ${2}
+
+}
+
+case ${1} in
+    execute:experiment)
+
+        # Create folder
+        mkdir -p ${2}
+
+
+
+        # we want 100 repetitions
+        x=1
+        while [ $x -le 100 ]
+        do
+          echo "Welcome $x times"
+
+          # ReplaceFirst will be replaced with x
+          # This will let us use x as random seed and output-x.txt file name
+          createFile explandmarks.xml ${2}/explandmarks.xml $x
+
+          cmd='argos3 -c $2/explandmarks.xml'
+
+          eval $cmd
+
+          x=$(( $x + 1 ))
+        done
+
+
+
+        # Succesful
+        echo "Successfully experiment \"${2}\""
+        ;;
+    *)
+        if [ -z ${1} ]; then
+            echo ""
+        else
+            echo "Could not find the command!"
+            echo ""
+        fi
+        echo "List of possible operations: "
+        echo -e "execute:experiment   - Takes local explandmarks.xml file and copy it into a folder given by a parameter e.g. execute:experiment exp1"
+        ;;
+esac
