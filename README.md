@@ -1,12 +1,12 @@
 SwarmRoboticsChaining
 =====================
+Swarm robotics project: Chaining and exploration
+
+Github: [feidens](https://github.com/feidens)
 
 
-# Swarm robotics project: Chaining and exploration
-
-* github: feidens
-
-
+## Argos 3 project
+* You can get argos 3 at https://github.com/ilpincy/argos3
 
 ## How to start
 
