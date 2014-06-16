@@ -20,4 +20,3 @@ Github: [feidens](https://github.com/feidens)
 
 ## Important
 * Notice that we developed the lua controller with beta 10 of argos 3
-* The same holds for the landmarks.xml file. It is the one provides in SS 2013
